@@ -40,8 +40,15 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+ENVTEST_ASSETS_DIR=$(LOCALBIN)/k8s
+
+.PHONY: envtest
+envtest: $(LOCALBIN) ## Download setup-envtest locally if necessary.
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
 .PHONY: test
-test: manifests generate fmt vet ## Run tests.
+test: manifests generate fmt vet envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(LOCALBIN)/setup-envtest use $(ENVTEST_K8S_VERSION) -p path --bin-dir $(ENVTEST_ASSETS_DIR))" \
 	go test ./... -coverprofile cover.out
 
 ##@ Build

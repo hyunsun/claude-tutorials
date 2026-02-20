@@ -30,7 +30,7 @@ const (
 type HelmReleaseReconciler struct {
 	client.Client
 	Scheme     *runtime.Scheme
-	HelmClient *HelmClient
+	HelmClient HelmClientInterface
 }
 
 // Reconcile is the main reconciliation loop.

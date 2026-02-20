@@ -17,6 +17,17 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
+// HelmClientInterface abstracts Helm operations so the reconciler can be tested
+// with a mock without requiring a real Helm/Kubernetes cluster.
+type HelmClientInterface interface {
+	Install(ctx context.Context, releaseName, chartName, repoURL, version, namespace string, values map[string]interface{}) error
+	Upgrade(ctx context.Context, releaseName, chartName, repoURL, version, namespace string, values map[string]interface{}) error
+	Uninstall(ctx context.Context, releaseName, namespace string) error
+	ReleaseExists(releaseName, namespace string) (bool, error)
+}
+
+var _ HelmClientInterface = (*HelmClient)(nil) // compile-time interface check
+
 // HelmClient wraps helm.sh/helm/v3/pkg/action to provide install, upgrade,
 // uninstall, and release-existence checks against a Kubernetes cluster.
 type HelmClient struct {
@@ -157,4 +168,3 @@ func (h *HelmClient) ReleaseExists(releaseName, namespace string) (bool, error) 
 	}
 	return true, nil
 }
-

@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Test (second/)
+    name: Test
     runs-on: ubuntu-latest
 
     steps:
@@ -17,15 +17,15 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: second/go.mod
-          cache-dependency-path: second/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       # Cache the envtest k8s binaries (etcd + kube-apiserver, ~100 MB).
       # Key includes OS, arch, and k8s version so a version bump auto-invalidates.
       - name: Cache envtest binaries
         uses: actions/cache@v4
         with:
-          path: second/bin/k8s
+          path: bin/k8s
           key: envtest-1.28.0-${{ runner.os }}-${{ runner.arch }}
 
       # Cache controller-gen and setup-envtest binaries separately so that
@@ -34,12 +34,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            second/bin/controller-gen
-            second/bin/setup-envtest
-          key: tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('second/go.sum') }}
+            bin/controller-gen
+            bin/setup-envtest
+          key: tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}
 
       - name: Check formatting
-        working-directory: second
         run: |
           unformatted=$(gofmt -l .)
           if [ -n "$unformatted" ]; then
@@ -49,12 +48,11 @@ jobs:
           fi
 
       - name: Run tests
-        working-directory: second
         run: make test
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: second/cover.out
+          path: cover.out
           if-no-files-found: error

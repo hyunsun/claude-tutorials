@@ -171,6 +171,59 @@ kind delete cluster --name helm-operator-demo
 
 ---
 
+## AI Diagnostics
+
+When a `HelmRelease` enters a `Failed` phase, a **Diagnose** button appears in the web UI. Clicking it sends the release's status conditions and Kubernetes events to Claude (claude-haiku-4-5), which streams back a plain-English explanation of the failure and a suggested fix.
+
+### Prerequisites
+
+An Anthropic API key from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys).
+
+### Running locally
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-... go run ./main.go --leader-elect=false
+```
+
+### Running in-cluster (Kind)
+
+```bash
+# Store the key as a Kubernetes secret
+kubectl create secret generic anthropic-api-key \
+  --from-literal=key=sk-ant-... \
+  -n helm-operator
+
+# Inject the secret into the operator pod
+kubectl patch deployment helm-operator -n helm-operator --type=json -p='[
+  {"op":"add","path":"/spec/template/spec/containers/0/env","value":[
+    {"name":"ANTHROPIC_API_KEY","valueFrom":{"secretKeyRef":{"name":"anthropic-api-key","key":"key"}}}
+  ]}
+]'
+
+kubectl rollout restart deployment/helm-operator -n helm-operator
+```
+
+### Try it — create a failing release
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: helm.example.com/v1alpha1
+kind: HelmRelease
+metadata:
+  name: my-broken
+  namespace: demo
+spec:
+  chart: podinfo
+  repoURL: https://stefanprodan.github.io/podinfo
+  version: "0.0.0"
+  targetNamespace: demo
+EOF
+```
+
+Version `0.0.0` does not exist, so the release will enter `Failed` phase within a few seconds. Open the web UI and click **Diagnose** on the `my-broken` row — Claude will stream a diagnosis explaining that the chart version was not found and suggest using a valid version.
+
+---
+
 ## Web UI
 
 The operator embeds a single-page UI served on `:8082`. No separate deployment is required.
@@ -186,6 +239,7 @@ The operator embeds a single-page UI served on `:8082`. No separate deployment i
 - **Edit** an existing release (chart, version, repo URL, values)
 - **Delete** a release (the operator's finalizer ensures the Helm release is also uninstalled)
 - **Live status updates** via Server-Sent Events — the table refreshes automatically as the operator reconciles changes
+- **Diagnose** a failed release — streams an AI explanation and suggested fix (requires `ANTHROPIC_API_KEY`)
 
 ### Running with the UI
 

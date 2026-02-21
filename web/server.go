@@ -104,6 +104,7 @@ func (s *WebServer) Start(ctx context.Context) error {
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 	mux.HandleFunc("/api/helmreleases", s.handleHelmReleases)
 	mux.HandleFunc("/api/events", s.handleSSE)
+	mux.HandleFunc("/api/diagnose", s.handleDiagnose)
 
 	srv := &http.Server{Addr: s.Addr, Handler: mux}
 

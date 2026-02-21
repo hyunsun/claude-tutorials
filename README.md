@@ -1,37 +1,25 @@
-# claude experiments
+# Helm Operator
 
-A hands-on comparison of how prompt quality affects AI-generated code.
+A Kubernetes Operator written in Go that installs, upgrades, and uninstalls Helm chart releases via a `HelmRelease` custom resource, with a built-in web UI.
 
-The same task — *"write a Kubernetes Operator in Go that manages Helm chart releases"* — is given twice:
-
-| | Prompt | Result |
-|---|---|---|
-| [`first/`](./first) | One vague sentence | Missing deps, no DeepCopy, no Helm calls — won't compile |
-| [`second/`](./second) | Full design doc | Production-quality operator with web UI, tests, and Makefile |
-
-Read each [`PROMPT.md`](./second/PROMPT.md) before looking at the code.
+Read [PROMPT.md](./PROMPT.md) to see the prompt that produced this code.
 
 ---
 
-## second/ — Well-Written Prompt Result
-
-A fully functional Kubernetes Operator that installs, upgrades, and uninstalls Helm chart releases via a `HelmRelease` custom resource, with a built-in web UI.
-
-### Prerequisites
+## Prerequisites
 
 - Go 1.21+
 - A running Kubernetes cluster (e.g. [kind](https://kind.sigs.k8s.io/), minikube, or any kubeconfig-reachable cluster)
 - `kubectl` configured to point at the cluster
 - `helm` CLI (for manual verification only)
 
-### Quick Start
+## Quick Start
 
 ```bash
 # 1. Install the CRD
-kubectl apply -f second/config/crd/bases/helm.example.com_helmreleases.yaml
+kubectl apply -f config/crd/bases/helm.example.com_helmreleases.yaml
 
 # 2. Run the operator locally (no Docker required)
-cd second
 go run ./main.go --leader-elect=false
 ```
 
@@ -66,7 +54,6 @@ kind create cluster --name helm-operator-demo
 ### 2. Build the Docker image
 
 ```bash
-cd second
 docker build -t helm-operator:v0.1.0 .
 ```
 
@@ -107,7 +94,7 @@ Then open **http://localhost:8082**.
 
 ---
 
-## Working Example — Deploy nginx via HelmRelease
+## Working Example — Deploy podinfo via HelmRelease
 
 ```bash
 kubectl create namespace demo
@@ -150,9 +137,9 @@ kind delete cluster --name helm-operator-demo
 
 The operator embeds a single-page UI served on `:8082`. No separate deployment is required.
 
-![Helm Release list view](second/docs/ui-screenshot-list.png)
+![Helm Release list view](docs/ui-screenshot-list.png)
 
-![Create new release modal](second/docs/ui-screenshot-create.png)
+![Create new release modal](docs/ui-screenshot-create.png)
 
 ### Features
 
@@ -165,7 +152,6 @@ The operator embeds a single-page UI served on `:8082`. No separate deployment i
 ### Running with the UI
 
 ```bash
-cd second
 make run-ui          # equivalent to: go run ./main.go --leader-elect=false --ui-bind-address=:8082
 ```
 
@@ -190,7 +176,7 @@ metadata:
 spec:
   chart: <chart-name>        # required
   repoURL: <repo-url>        # required
-  version: <chart-version>   # required — exact semver (e.g. "15.0.0")
+  version: <chart-version>   # required — exact semver (e.g. "6.5.4")
   targetNamespace: <ns>      # required — where the Helm release is installed
   releaseName: <name>        # optional — overrides the Helm release name
   values: {}                 # optional — arbitrary Helm values
@@ -208,21 +194,21 @@ kubectl get hr -n demo -w                                    # watch for phase c
 kubectl apply -f helmrelease.yaml
 
 # Inspect
-kubectl describe hr my-nginx -n demo                         # phase, conditions, revision
-kubectl get hr my-nginx -n demo -o yaml                      # full resource
+kubectl describe hr my-podinfo -n demo                       # phase, conditions, revision
+kubectl get hr my-podinfo -n demo -o yaml                    # full resource
 
 # Upgrade — edit spec, operator reconciles automatically (Ready → Upgrading → Ready)
-kubectl patch hr my-nginx -n demo --type=merge -p '{"spec":{"version":"15.1.0"}}'
-kubectl edit hr my-nginx -n demo
+kubectl patch hr my-podinfo -n demo --type=merge -p '{"spec":{"version":"6.6.0"}}'
+kubectl edit hr my-podinfo -n demo
 
 # Delete — finalizer runs helm uninstall before CR is removed
-kubectl delete hr my-nginx -n demo
+kubectl delete hr my-podinfo -n demo
 
 # Operator logs
 kubectl logs -n helm-operator -l app.kubernetes.io/name=helm-operator -f
 
 # Events for a specific release
-kubectl events --for helmrelease/my-nginx -n demo
+kubectl events --for helmrelease/my-podinfo -n demo
 ```
 
 ---
@@ -230,46 +216,42 @@ kubectl events --for helmrelease/my-nginx -n demo
 ## Project Structure
 
 ```
-claude-tutorials/
+helm-operator/
 ├── README.md
-├── first/                        ← poor-prompt version (won't compile)
-│   ├── PROMPT.md
-│   ├── main.go
-│   ├── api/v1alpha1/
-│   └── controllers/
-└── second/                       ← well-written-prompt version
-    ├── PROMPT.md
-    ├── Dockerfile                ← multi-stage build (distroless runtime)
-    ├── main.go                   ← operator entry point
-    ├── Makefile
-    ├── api/v1alpha1/
-    │   ├── helmrelease_types.go  ← CRD schema
-    │   └── zz_generated.deepcopy.go
-    ├── chart/                    ← Helm chart for deploying the operator
-    │   ├── Chart.yaml
-    │   ├── values.yaml
-    │   ├── crds/
-    │   │   └── helm.example.com_helmreleases.yaml
-    │   └── templates/
-    │       ├── _helpers.tpl
-    │       ├── serviceaccount.yaml
-    │       ├── clusterrole.yaml
-    │       ├── clusterrolebinding.yaml
-    │       ├── deployment.yaml
-    │       └── service.yaml
-    ├── config/crd/bases/         ← generated CRD (source of truth)
-    ├── controllers/
-    │   ├── helmrelease_controller.go  ← reconciler
-    │   └── helmclient.go              ← Helm SDK wrapper
-    └── web/
-        ├── server.go             ← HTTP server + SSE broker
-        └── static/
-            └── index.html        ← embedded single-page UI
+├── PROMPT.md
+├── Dockerfile                ← multi-stage build (distroless runtime)
+├── main.go                   ← operator entry point
+├── Makefile
+├── go.mod / go.sum
+├── api/v1alpha1/
+│   ├── helmrelease_types.go  ← CRD schema
+│   └── zz_generated.deepcopy.go
+├── chart/                    ← Helm chart for deploying the operator
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   ├── crds/
+│   │   └── helm.example.com_helmreleases.yaml
+│   └── templates/
+│       ├── _helpers.tpl
+│       ├── serviceaccount.yaml
+│       ├── clusterrole.yaml
+│       ├── clusterrolebinding.yaml
+│       ├── deployment.yaml
+│       └── service.yaml
+├── config/crd/bases/         ← generated CRD (source of truth)
+├── controllers/
+│   ├── helmrelease_controller.go  ← reconciler
+│   └── helmclient.go              ← Helm SDK wrapper
+├── docs/                     ← screenshots and assets
+└── web/
+    ├── server.go             ← HTTP server + SSE broker
+    └── static/
+        └── index.html        ← embedded single-page UI
 ```
 
 ---
 
-## Makefile Targets (second/)
+## Makefile Targets
 
 ```bash
 make build        # compile binary to bin/manager
@@ -285,20 +267,3 @@ make docker-push  # push image to registry
 make install      # kubectl apply CRDs
 make deploy       # kubectl apply all manifests
 ```
-
----
-
-## Key Design Contrasts (first vs second)
-
-| Concern | `first/` (poor prompt) | `second/` (well-written prompt) |
-|---------|----------------------|--------------------------------|
-| CRD spec fields | `chart`, `repoURL`, `version` | + `targetNamespace`, `releaseName`, `values` |
-| Status model | `installed: bool` | `phase`, `conditions`, `deployedVersion`, `helmRevision`, `lastDeployedAt` |
-| DeepCopy | Missing — won't compile | Full `zz_generated.deepcopy.go` |
-| Helm calls | `fmt.Printf` + TODO | Real `helm.sh/helm/v3/pkg/action` calls |
-| Finalizer | None — orphans releases on delete | `helm.example.com/finalizer` |
-| RBAC markers | None | Full `+kubebuilder:rbac` markers |
-| Error handling | No requeue | `setFailedStatus`, requeues after 30 s |
-| Web UI | None | Embedded SPA on `:8082` |
-| Tests | None | envtest + Ginkgo suite |
-| Makefile | None | Full set of targets |

@@ -1,8 +1,46 @@
-# Helm Operator
+# Claude Experiment
 
-A Kubernetes Operator written in Go that installs, upgrades, and uninstalls Helm chart releases via a `HelmRelease` custom resource, with a built-in web UI.
+This repository is an experiment in AI-assisted software development using [Claude Code](https://claude.ai/code) and the **Claude Agent SDK**.
 
-Read [PROMPT.md](./PROMPT.md) to see the prompt that produced this code.
+## How This Code Was Built
+
+The entire codebase was written by Claude — no code was written by hand. It demonstrates two things: how prompt quality affects output quality, and how a team of AI agents can collaborate on a feature in parallel.
+
+### The operator (initial version)
+
+The core Helm Operator was generated from a single detailed prompt — a full design document specifying the CRD schema, reconciler behaviour, RBAC requirements, status model, error handling, and project structure. Read [PROMPT.md](./PROMPT.md) to see the exact prompt.
+
+### The AI Diagnostics feature (agent team)
+
+The AI-powered diagnosis feature was built by a **three-agent team** coordinated entirely through the Claude Agent SDK:
+
+```
+You (human)
+  └── Claude Code (outer agent — you are here)
+        └── Team Lead Agent
+              ├── Backend Agent  ── ran in parallel ──┐
+              └── Frontend Agent ── ran in parallel ──┘
+```
+
+- **Team Lead** read the codebase, defined the API contract between frontend and backend, spawned the two worker agents in parallel, waited for both to finish, then pushed all commits.
+- **Backend Agent** added the Anthropic SDK, wrote `web/claude_client.go` and `web/diagnose.go`, and registered the new route in `web/server.go`.
+- **Frontend Agent** added the Diagnose button (shown only on Failed releases), the streaming diagnosis panel, and the SSE reader in `web/static/index.html`.
+
+The two worker agents ran concurrently and touched entirely separate files, so there were no conflicts. Each agent made its own `git commit` — visible in the history with distinct `Co-Authored-By` lines:
+
+```bash
+git log --oneline
+# 45071f2 feat(ui): add Diagnose button and streaming diagnosis panel
+# 95403af feat(backend): add AI diagnosis endpoint
+```
+
+```bash
+git show 95403af --no-patch --format="%B"
+# Co-Authored-By: Backend Agent (Claude) <noreply@anthropic.com>
+
+git show 45071f2 --no-patch --format="%B"
+# Co-Authored-By: Frontend Agent (Claude) <noreply@anthropic.com>
+```
 
 ---
 
